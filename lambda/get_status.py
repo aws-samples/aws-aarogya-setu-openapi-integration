@@ -16,6 +16,8 @@ PASSWORD = None
 
 # global variables
 RANDOM_STR_LEN = 5
+USER_STATUS_EXPIRY_DAYS = 0.9
+PENDING_REQUEST_EXPIRY_HOURS = 0.9
 ssm = boto3.client("ssm")
 ddb = boto3.resource("dynamodb")
 user_status_table = ddb.Table(os.environ["USER_STATUS_TABLE"])
@@ -24,13 +26,12 @@ mobile_number = None
 token = None
 request_id = None
 headers = {
-    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent",
+    "Access-Control-Allow-Headers": "Authorization",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+    "Access-Control-Allow-Methods": "POST",
     "Access-Control-Allow-Credentials": True,
 }
 return_status = {"headers": headers}
-random_str_len = 5
 
 
 def fetch_parameters():
@@ -66,7 +67,7 @@ def store_return_status(return_status):
     user status table.
     """
 
-    expdate = datetime.now() + timedelta(days=0.9)
+    expdate = datetime.now() + timedelta(days=USER_STATUS_EXPIRY_DAYS)
     expdate = str(int(expdate.timestamp()))
 
     # store status in ddb
@@ -153,7 +154,7 @@ def create_new_request():
     url = "https://api.aarogyasetu.gov.in/userstatus"
     timestamp = datetime.today().strftime("%Y-%m-%d-%H:%M:%S")
     randomstr = "".join(
-        random.choices(string.ascii_uppercase + string.digits, k=random_str_len)
+        random.choices(string.ascii_uppercase + string.digits, k=RANDOM_STR_LEN)
     )
     trace_id = timestamp + "-" + randomstr
 
@@ -177,7 +178,7 @@ def create_new_request():
     request_id = res.json()["requestId"]
 
     # log pending request in ddb
-    expdate = datetime.now() + timedelta(hours=0.9)
+    expdate = datetime.now() + timedelta(hours=PENDING_REQUEST_EXPIRY_HOURS)
     expdate = str(int(expdate.timestamp()))
     requests_table.put_item(
         Item={
