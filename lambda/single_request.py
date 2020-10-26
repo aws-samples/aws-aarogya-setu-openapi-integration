@@ -15,6 +15,6 @@ def handler(event, context):
 
     mobile_number = json.loads(event["body"])["mobile_number"]
     return_status = check_mobile_number(mobile_number)
-    LOG.INFO(return_status)
+    LOG.info(return_status)
 
     return return_status

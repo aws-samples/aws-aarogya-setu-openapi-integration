@@ -29,7 +29,7 @@ def handler(event, context):
         LOG.info(f"Added to queue {number}")
 
     headers = {
-        "Access-Control-Allow-Headers": "Authorization",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST",
         "Access-Control-Allow-Credentials": True,
