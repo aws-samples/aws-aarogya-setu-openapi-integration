@@ -9,8 +9,6 @@ from aws_cdk import (
     aws_ssm as ssm,
 )
 
-from cdk_dynamo_table_viewer import TableViewer
-
 
 API_NAME = "asetuapipoc"
 
@@ -214,13 +212,31 @@ class AsetuapiStack(core.Stack):
             "AuthorizerId", {"Ref": auth.logical_id}
         )
 
-        core.CfnOutput(self, "user-pool-id", value=user_pool.user_pool_id)
         core.CfnOutput(
-            self, "user-pool-web-client", value=user_pool_client.user_pool_client_id
+            self,
+            "user-pool-id",
+            value=user_pool.user_pool_id,
+            export_name="user-pool-id",
         )
-        core.CfnOutput(self, "api-name", value=API_NAME)
-        core.CfnOutput(self, "endpoint-url", value=api.url)
-        core.CfnOutput(self, "deployment-region", value=self.region)
+        core.CfnOutput(
+            self,
+            "user-pool-web-client",
+            value=user_pool_client.user_pool_client_id,
+            export_name="user-pool-web-client",
+        )
+        core.CfnOutput(self, "api-name", value=API_NAME, export_name="api-name")
+        core.CfnOutput(
+            self, "api-endpoint-url", value=api.url, export_name="api-endpoint-url"
+        )
+        core.CfnOutput(
+            self,
+            "deployment-region",
+            value=self.region,
+            export_name="deployment-region",
+        )
+        core.CfnOutput(
+            self, "stack-name", value=self.stack_name, export_name="stack-name"
+        )
 
     @property
     def display_table(self) -> ddb.Table:
