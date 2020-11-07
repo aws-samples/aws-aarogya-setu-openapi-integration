@@ -5,26 +5,46 @@ import boto3
 import os
 import random
 import string
+import logging
 
 from datetime import datetime, timedelta
 
 # global variables
+LOG = logging.getLogger()
+LOG.setLevel(logging.INFO)
 RANDOM_STR_LEN = 5
 USER_STATUS_EXPIRY_DAYS = 0.9
 PENDING_REQUEST_EXPIRY_HOURS = 0.9
 TOKEN_URL = "https://api.aarogyasetu.gov.in/token"
 USER_STATUS_URL = "https://api.aarogyasetu.gov.in/userstatus"
 USER_STATUS_BY_REQUEST_URL = "https://api.aarogyasetu.gov.in/userstatusbyreqid"
+DATE_TIME_FORMAT = "%Y-%m-%d-%H:%M:%S"
 ssm = boto3.client("ssm")
 ddb = boto3.resource("dynamodb")
-user_status_table = ddb.Table(os.environ["USER_STATUS_TABLE"])
-requests_table = ddb.Table(os.environ["REQUESTS_TABLE"])
 
 
-def create_return_status(statusCode, body):
-    """
+def create_return_header():
+    """Create a return header with appropriate options"""
+
+    headers = {
+        "Access-Control-Allow-Headers": "Authorization",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Credentials": True,
+    }
+
+    return headers
+
+
+def create_return_status(status_code: int, body: str):
+    """ 
     Create return status using a fixed set of header options and the
-    statusCode and body passed as parameters
+    status_code and body passed as parameters.
+
+    Parameters
+    ----------
+    status_code: HTTP status code of return response
+    body: Body of return response
     """
 
     headers = {
@@ -37,10 +57,15 @@ def create_return_status(statusCode, body):
     return {"headers": headers, "statusCode": statusCode, "body": body}
 
 
-def create_request_header(API_KEY, token=None):
+def create_request_header(API_KEY: str, token: str = None):
     """
     Create header for API request to Aarogya Setu. There can be two types
-    of headers one with token and one without it
+    of headers one with token and one without it.
+
+    Parameters
+    ----------
+    API_KEY: API_KEY given by aarogya setu fetched from parameter store
+    token: Request token given returned as reponse from TOKEN_URL
     """
 
     if token is None:
@@ -61,10 +86,10 @@ def create_request_header(API_KEY, token=None):
 def create_trace_id():
     """
     Create a unique trace_id by combining current timestamp and some random
-    ascii test
+    ascii uppercase text.
     """
 
-    timestamp = datetime.today().strftime("%Y-%m-%d-%H:%M:%S")
+    timestamp = datetime.today().strftime(DATE_TIME_FORMAT)
     randomstr = "".join(
         random.choices(string.ascii_uppercase + string.digits, k=RANDOM_STR_LEN)
     )
@@ -76,7 +101,9 @@ def create_trace_id():
 def fetch_parameters():
     """
     Fetch Aarogya Setu API specific credentials and keys from parameter store
-    and store it in global variables
+
+    TODO: decrypt tokens
+    TODO: return none if network error
     """
 
     JWT_KEY = os.environ.get("JWT_KEY")
@@ -105,6 +132,13 @@ def store_user_status(number, return_status):
     """
     Takes a status response adds an expiration time stamp to it and
     stores it in user status table.
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
+    return_status: Return response to be returned by API
+
+    TODO: Error handling if network fails
     """
 
     expdate = datetime.now() + timedelta(days=USER_STATUS_EXPIRY_DAYS)
@@ -125,6 +159,14 @@ def store_pending_request(number, token, request_id):
     """
     Store pending request identified by the tuple of mobile number, API token,
     and unique request id. The record has an expiry duration.
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
+    token: Request token given returned as reponse from TOKEN_URL
+    request_id: Request id returned by response from USER_STATUS_URL
+
+    TODO: Add error handling
     """
 
     expdate = datetime.now() + timedelta(hours=PENDING_REQUEST_EXPIRY_HOURS)
@@ -145,6 +187,10 @@ def delete_pending_request(number):
     """
     Delete pending request after it has been used to successfully get user
     status
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
     """
 
     requests_table = ddb.Table(os.environ["REQUESTS_TABLE"])
@@ -154,9 +200,14 @@ def delete_pending_request(number):
 def get_pending_request(number):
     """
     Get pending request from table. If it has expired return None
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
+
+    TODO: check expiry and return none
     """
 
-    # TODO check expiry
     requests_table = ddb.Table(os.environ["REQUESTS_TABLE"])
     return requests_table.get_item(Key={"mobile_number": number}).get("Item")
 
@@ -164,9 +215,14 @@ def get_pending_request(number):
 def check_user_status(number):
     """
     Get user status from table. If it has expired return None
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
+
+    TODO: check expiry and return none
     """
 
-    # TODO check expiry
     user_status_table = ddb.Table(os.environ["USER_STATUS_TABLE"])
     return user_status_table.get_item(Key={"mobile_number": number}).get("Item")
 
@@ -175,6 +231,14 @@ def get_token(API_KEY, USERNAME, PASSWORD):
     """
     Get API token from Aarogya Setu it is valid for one hour and one succesful
     status request
+
+    Parameters
+    ----------
+    API_KEY: API_KEY given by aarogya setu fetched from parameter store
+    USERNAME: USERNAME for aarogya setu fetched from parameter store
+    PASSWORD: PASSWORD for aarogya setu fetched from parameter store
+
+    TODO: fix error message
     """
 
     url = TOKEN_URL
@@ -187,7 +251,6 @@ def get_token(API_KEY, USERNAME, PASSWORD):
     else:
         return res.json()["token"]
 
-        # TODO fix error message
         return_status = None
         print(res.content)
         error = json.loads(res.content)["error_message"]
@@ -202,6 +265,16 @@ def create_new_request(number, token, API_KEY, USERNAME, PASSWORD):
     """
     Create a new request with Aarogya Setu. Store both token and request id
     in the pending requests table.
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
+    token: Request token given returned as reponse from TOKEN_URL
+    API_KEY: API_KEY given by aarogya setu fetched from parameter store
+    USERNAME: USERNAME for aarogya setu fetched from parameter store
+    PASSWORD: PASSWORD for aarogya setu fetched from parameter store
+
+    TODO: return error message
     """
 
     # get request id
@@ -228,6 +301,12 @@ def get_status_content(number, token, request_id, API_KEY):
     """
     Get status for a pending request. Delete entry from pending request table
     if successfully gets status
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
+    token: Request token given returned as reponse from TOKEN_URL
+    API_KEY: API_KEY given by aarogya setu fetched from parameter store
     """
 
     url = USER_STATUS_BY_REQUEST_URL
@@ -247,6 +326,12 @@ def decode_status(number, content, JWT_SECRET):
     """
     Decode user status using the jwt secret token and return an appropriate
     return status
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
+    content: Encoded status returned as reponse from USER_STATUS_BY_REQUEST_URL
+    JWT_SECRET: secret set in aarogya setu fetched from parameter store
     """
 
     if content["request_status"] == "Approved":
@@ -274,6 +359,10 @@ def check_mobile_number(number):
     Check mobile number for COVID status. It first checks user status table
     for cached entry. If the entry is expired it makes a fresh request and then
     gets status for the request
+
+    Parameters
+    ----------
+    number: User mobile number of the format "+919XXXXXXXXX"
     """
 
     # check if status exists in ddb
