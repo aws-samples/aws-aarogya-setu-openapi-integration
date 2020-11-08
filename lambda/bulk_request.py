@@ -11,8 +11,31 @@ LOG = getLogger()
 LOG.setLevel(logging.INFO)
 
 
-def get_return_status_format():
-    return {"headers": None, "statusCode": None}
+def create_response_headers():
+
+    headers = {
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Credentials": True,
+    }
+
+    return headers
+
+
+def create_return_status(status_code, body):
+    """
+    Create return status
+
+    Parameters
+    ----------
+    status_code: int
+        Status code for response
+    body: str
+        response body
+    """"
+
+    return {"headers": create_response_headers(), "statusCode": status_code, "body": body}
 
 
 def handler(event, context):
