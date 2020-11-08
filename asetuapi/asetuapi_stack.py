@@ -150,13 +150,30 @@ class AsetuapiStack(core.Stack):
         queue_receiver.add_event_source(
             events.SqsEventSource(bulk_request_queue, batch_size=1)
         )
+
+        scan_table = _lambda.Function(
+            self,
+            "ScanTableHandler",
+            runtime=_lambda.Runtime.PYTHON_3_7,
+            code=_lambda.Code.asset("lambda"),
+            handler="scan_table.handler",
+            timeout=core.Duration.seconds(30),
+            environment={
+                "USER_STATUS_TABLE": user_status_table.table_name,
+            },
+        )
+
+        # grant permissions to lambda functions
         bulk_request_queue.grant_consume_messages(queue_receiver)
         user_status_table.grant_read_write_data(queue_receiver)
         requests_table.grant_read_write_data(queue_receiver)
+
         jwt_secret.grant_read(bulk_request)
         api_key.grant_read(bulk_request)
         username.grant_read(bulk_request)
         password.grant_read(bulk_request)
+
+        user_status_table.grant_read_data(scan_table)
 
         # create api endpoints with authorization
         api = apigw.RestApi(
@@ -209,6 +226,22 @@ class AsetuapiStack(core.Stack):
             "AuthorizationType", "COGNITO_USER_POOLS"
         )
         bulk_method.node.find_child("Resource").add_property_override(
+            "AuthorizerId", {"Ref": auth.logical_id}
+        )
+
+        scan_table_integration = apigw.LambdaIntegration(scan_table, proxy=True)
+        scan_table_resource = api.root.add_resource("scan")
+        scan_method = bulk_request_resource.add_method(
+            "GET",
+            scan_table_integration,
+            api_key_required=False,
+            authorizer=auth,
+            authorization_type=apigw.AuthorizationType.COGNITO,
+        )
+        scan_method.node.find_child("Resource").add_property_override(
+            "AuthorizationType", "COGNITO_USER_POOLS"
+        )
+        scan_method.node.find_child("Resource").add_property_override(
             "AuthorizerId", {"Ref": auth.logical_id}
         )
 
