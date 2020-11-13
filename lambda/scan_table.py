@@ -3,11 +3,17 @@ import json
 import boto3
 import logging
 
-from datetime import datetime, timedelta
+from botocore.exceptions import ClientError
+from datetime import datetime
+
 
 USER_STATUS_EXPIRY_DAYS = 0.9
 
 ddb = boto3.resource("dynamodb")
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 def create_response_headers():
     """
@@ -36,7 +42,11 @@ def create_response(status_code, body):
         response body
     """
 
-    return {"headers": create_response_headers(), "statusCode": status_code, "body": body}
+    return {
+        "headers": create_response_headers(),
+        "statusCode": status_code,
+        "body": body,
+    }
 
 
 def handler(event, context):
@@ -47,24 +57,31 @@ def handler(event, context):
     ----------
     event: dict
         event parameters passed to function
-    body: dict
+    context: dict
         context parameters passed to function
     """
 
-    USER_STATUS_TABLE = os.env.get("USER_STATUS_TABLE")
+    USER_STATUS_TABLE = os.environ.get("USER_STATUS_TABLE")
     table = ddb.Table(USER_STATUS_TABLE)
-    data = table.scan()  # returns a payload of max 1 MB
+
+    try:
+        data = table.scan()  # returns a payload of max 1 MB
+    except ClientError as e:
+        logger.error(f"Unable to scan table {USER_STATUS_TABLE}.\n{e}")
+        return create_response(502, json.dumps([]))
 
     items = []
     for item in data["Items"]:
 
+        # TODO add this before publishing
         # ignore expired items
-        if item["expdate"] < str(int(datetime.now().timestamp())):
-            continue
+        # if item["expdate"] < str(int(datetime.now().timestamp())):
+        #     continue
 
         del item["expdate"]
-        del item["statusCode"]
+        del item["request_status"]
 
+        item["colour"] = "#FFFFFF"  # temporary
         items.append(item)
 
     return create_response(200, json.dumps(items))

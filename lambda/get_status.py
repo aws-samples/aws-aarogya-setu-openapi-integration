@@ -6,8 +6,10 @@ import os
 import random
 import string
 import logging
+import re
 
 from datetime import datetime, timedelta
+from botocore.exceptions import ClientError
 
 # create logger
 logging.basicConfig()
@@ -22,6 +24,11 @@ TOKEN_URL = "https://api.aarogyasetu.gov.in/token"
 USER_STATUS_URL = "https://api.aarogyasetu.gov.in/userstatus"
 USER_STATUS_BY_REQUEST_URL = "https://api.aarogyasetu.gov.in/userstatusbyreqid"
 DATE_TIME_FORMAT = "%Y-%m-%d-%H:%M:%S"
+APPROVED = "Approved"
+PENDING = "Pending"
+WHITE = "0xFFFFFF"
+MOBILE_NUMBER_EXPRESSION = re.compile(r"^\+91\d{10}$")
+
 ssm = boto3.client("ssm")
 ddb = boto3.resource("dynamodb")
 
@@ -99,7 +106,12 @@ class Secret:
         """
 
         responses = ssm.get_parameters(
-            Names=[envvar.JWT_KEY, envvar.API_KEY_KEY, envvar.USERNAME_KEY, envvar.PASSWORD_KEY],
+            Names=[
+                envvar.JWT_KEY,
+                envvar.API_KEY_KEY,
+                envvar.USERNAME_KEY,
+                envvar.PASSWORD_KEY,
+            ],
             WithDecryption=False,
         )
 
@@ -126,6 +138,19 @@ class Secret:
             raise SystemExit
 
 
+def expired(expdate):
+    """
+    Checks if the expiry date field from a record is past
+
+    Parameters
+    ----------
+    expdata: str
+        Expiry date timestamp
+    """
+
+    return expdate < str(int(datetime.now().timestamp()))
+
+
 def create_return_header():
     """Create a return header with appropriate options"""
 
@@ -139,8 +164,27 @@ def create_return_header():
     return headers
 
 
-def create_return_status(status_code, body):
-    """ 
+def create_return_body(mobile_number, message, colour="#FFFFFF"):
+    """
+    Create jsonified return response body
+
+    Parameters
+    ----------
+    number: str
+        User mobile number of the format "+919XXXXXXXXX"
+    message: str
+        User status message
+    color: str
+        User status colour hex code
+    """
+
+    body = {"mobile_number": mobile_number, "message": message, "colour": colour}
+
+    return json.dumps(body)
+
+
+def create_return_response(status_code, body):
+    """
     Create return status using a fixed set of header options and the
     status_code and body passed as parameters.
 
@@ -159,10 +203,10 @@ def create_return_status(status_code, body):
         "Access-Control-Allow-Credentials": True,
     }
 
-    return {"headers": headers, "statusCode": statusCode, "body": body}
+    return {"headers": headers, "statusCode": status_code, "body": body}
 
 
-def create_request_header(secret, token = None):
+def create_request_header(secret, token=None):
     """
     Create header for API request to Aarogya Setu. There can be two types
     of headers one with token and one without it.
@@ -205,8 +249,7 @@ def create_trace_id():
     return trace_id
 
 
-
-def store_user_status(number, return_status, envvar):
+def store_user_status(number, status, request_status, envvar):
     """
     Takes a status response adds an expiration time stamp to it and
     stores it in user status table.
@@ -215,29 +258,33 @@ def store_user_status(number, return_status, envvar):
     ----------
     number: str
         User mobile number of the format "+919XXXXXXXXX"
-    return_status: dict
-        Return response to be returned by API
+    status: dict
+        Status returned by Aarogya Setu API
+    request_status: str
+        Request status is either Approved or Rejected
     envvar: EnvVar
         Object contains environment variables
-
-    TODO: Error handling if network fails
     """
 
     expdate = datetime.now() + timedelta(days=USER_STATUS_EXPIRY_DAYS)
     expdate = str(int(expdate.timestamp()))
     user_status_table = ddb.Table(envvar.USER_STATUS_TABLE)
 
-    user_status_table.put_item(
-        Item={
-            "mobile_number": number,
-            "message": return_status["body"],
-            "expdate": expdate,
-            "statusCode": return_status["statusCode"],
-        },
-    )
+    try:
+        user_status_table.put_item(
+            Item={
+                "mobile_number": number,
+                "message": status["message"],
+                "colour": status["color_code"],
+                "expdate": expdate,
+                "request_status": request_status,
+            },
+        )
+    except ClientError as e:
+        logger.error(f"Failed to store user status\n{e}")
 
 
-def store_pending_request(number, token, request_id):
+def store_pending_request(number, token, request_id, envvar):
     """
     Store pending request identified by the tuple of mobile number, API token,
     and unique request id. The record has an expiry duration.
@@ -252,28 +299,33 @@ def store_pending_request(number, token, request_id):
         Request id returned by response from USER_STATUS_URL
     envvar: EnvVar
         Object contains environment variables
-
-    TODO: Add error handling
     """
 
     expdate = datetime.now() + timedelta(hours=PENDING_REQUEST_EXPIRY_HOURS)
     expdate = str(int(expdate.timestamp()))
     requests_table = ddb.Table(envvar.REQUESTS_TABLE)
 
-    requests_table.put_item(
-        Item={
-            "mobile_number": number,
-            "token": token,
-            "request_id": request_id,
-            "expdate": expdate,
-        },
-    )
+    try:
+        requests_table.put_item(
+            Item={
+                "mobile_number": number,
+                "token": token,
+                "request_id": request_id,
+                "expdate": expdate,
+            },
+        )
+    except ClientError as e:
+        logger.error(f"Failed to store pending request.\n{e}")
 
 
-def delete_pending_request(number):
+def delete_pending_request(number, envvar):
     """
     Delete pending request after it has been used to successfully get user
-    status
+    status.
+
+    Note: If a request_id has been used to successfully get user status it
+    should be deleted because it cannot be used to make status requests
+    anymore.
 
     Parameters
     ----------
@@ -284,10 +336,14 @@ def delete_pending_request(number):
     """
 
     requests_table = ddb.Table(envvar.REQUESTS_TABLE)
-    requests_table.delete_item(Key={"mobile_number": number})
+
+    try:
+        requests_table.delete_item(Key={"mobile_number": number})
+    except ClientError as e:
+        logger.error(f"Failed to delete pending request.\n{e}")
 
 
-def get_pending_request(number):
+def get_pending_request(number, envvar):
     """
     Get pending request from table. If it has expired return None
 
@@ -297,15 +353,23 @@ def get_pending_request(number):
         User mobile number of the format "+919XXXXXXXXX"
     envvar: EnvVar
         Object contains environment variables
-
-    TODO: check expiry and return none
     """
 
     requests_table = ddb.Table(envvar.REQUESTS_TABLE)
-    return requests_table.get_item(Key={"mobile_number": number}).get("Item")
+
+    try:
+        item = requests_table.get_item(Key={"mobile_number": number}).get("Item")
+    except ClientError as e:
+        logger.error(f"Failed to get pending request from table.\n{e}")
+        return None
+
+    if item and not expired(item["expdate"]):
+        return item
+    else:
+        return None
 
 
-def check_user_status(number):
+def check_user_status(number, envvar):
     """
     Get user status from table. If it has expired return None
 
@@ -315,12 +379,20 @@ def check_user_status(number):
         User mobile number of the format "+919XXXXXXXXX"
     envvar: EnvVar
         Object contains environment variables
-
-    TODO: check expiry and return none
     """
 
     user_status_table = ddb.Table(envvar.USER_STATUS_TABLE)
-    return user_status_table.get_item(Key={"mobile_number": number}).get("Item")
+
+    try:
+        item = user_status_table.get_item(Key={"mobile_number": number}).get("Item")
+    except ClientError as e:
+        logger.error(f"Failed to get existing user status.\n{e}")
+        return None
+
+    if item and not expired(item["expdate"]):
+        return item
+    else:
+        return None
 
 
 def get_token(secret):
@@ -332,28 +404,18 @@ def get_token(secret):
     ----------
     envvar: Secret
         Object contains secrets
-
-    TODO: fix error message
     """
 
     url = TOKEN_URL
-    headers = create_request_header(secret.API_KEY)
+    headers = create_request_header(secret)
     body = {"username": secret.USERNAME, "password": secret.PASSWORD}
 
     res = requests.post(url, data=json.dumps(body), headers=headers)
     if res.status_code != requests.codes.ok:
+        logger.error(f"Aarogya Setu API failed to get token.\n{res.content}")
         return None
     else:
         return res.json()["token"]
-
-        return_status = None
-        print(res.content)
-        error = json.loads(res.content)["error_message"]
-        return_status["statusCode"] = 203
-        return_status["body"] = json.dumps(
-            "Aarogya Set API failed to get token. Please try again. Error: " + error
-        )
-        return return_status
 
 
 def create_new_request(number, token, secret):
@@ -369,15 +431,12 @@ def create_new_request(number, token, secret):
         Request token given returned as reponse from TOKEN_URL
     secret: Secret
         Object contains secrets
-
-    TODO: return error message
     """
 
-    # get request id
     url = USER_STATUS_URL
     trace_id = create_trace_id()
 
-    headers = create_request_header(secret.API_KEY, token)
+    headers = create_request_header(secret, token)
     body = {
         "phone_number": number,
         "trace_id": trace_id,
@@ -386,8 +445,7 @@ def create_new_request(number, token, secret):
 
     res = requests.post(url, data=json.dumps(body), headers=headers)
     if res.status_code != requests.codes.ok:
-        # TODO log error
-        # error = json.loads(res.content)["error_message"]
+        logger.error(f"Aarogya Setu API failed to get request id.\n{res.content}")
         return None
     else:
         return res.json()["requestId"]
@@ -409,51 +467,79 @@ def get_status_content(number, token, request_id, secret):
     """
 
     url = USER_STATUS_BY_REQUEST_URL
-    headers = create_request_header(secret.API_KEY, token)
+    headers = create_request_header(secret, token)
     body = {"requestId": request_id}
 
     res = requests.post(url, data=json.dumps(body), headers=headers)
     if res.status_code != requests.codes.ok:
-        # TODO log error
-        # error = json.loads(res.content)["error_message"]
+        logger.error(
+            f"Aarogya Setu API failed to get status for given request.\n{res.content}"
+        )
         return None
+    else:
+        return res.json()
 
-    return res.json()
 
-
-def decode_status(number, content, secret):
+def decode_status(content, secret):
     """
     Decode user status using the jwt secret token and return an appropriate
     return status
 
     Parameters
     ----------
-    number: str
-        User mobile number of the format "+919XXXXXXXXX"
     content: dict
         Encoded status returned as reponse from USER_STATUS_BY_REQUEST_URL
     secret: Secret
         Object contains secrets
     """
 
-    if content["request_status"] == "Approved":
-        coded_status = content["as_status"]
-        status = jwt.decode(coded_status, secret.JWT_SECRET)
+    coded_status = content["as_status"]
+    status = jwt.decode(coded_status, secret.JWT_SECRET)
+    logger.info(status)
 
-        message = json.dumps(status["as_status"]["message"])
-        return_status = create_return_status(200, message)
+    return status["as_status"]
 
-        # delete entry because token and request have expired
 
-    elif content["request_status"] == "Pending":
-        message = json.dumps("Please wait for user to approve request")
-        return_status = create_return_status(200, message)
+def create_reponse_from_status(number, status, request_status):
+    """
+    Create return response based on request status
 
+    Parameters
+    ----------
+    number: str
+        User mobile number of the format "+919XXXXXXXXX"
+    status: dict
+        status of user given by Aarogya Setu API
+    request_status: str
+        Request status between Approved, Pending and Rejected
+    """
+
+    if request_status == APPROVED:
+        message = create_return_body(number, status["message"], status["color_code"])
+        return_response = create_return_response(200, message)
+    elif request_status == PENDING:
+        message = create_return_body(number, "Please wait for user to approve request")
+        return_response = create_return_response(200, message)
     else:
-        message = json.dumps("User has denied request. Please make a new request")
-        return_status = create_return_status(200, message)
+        message = create_return_body(
+            number, "User has denied request. Please make a new request"
+        )
+        return_response = create_return_response(200, message)
 
-    return return_status
+    return return_response
+
+
+def valid_mobile_number(number):
+    """
+    Check if the mobile number is valid
+
+    Parameters
+    ----------
+    number: str
+        User mobile number of the format "+919XXXXXXXXX"
+    """
+
+    return MOBILE_NUMBER_EXPRESSION.match(number)
 
 
 def check_mobile_number(number):
@@ -468,45 +554,72 @@ def check_mobile_number(number):
         User mobile number of the format "+919XXXXXXXXX"
     """
 
+    # reject empty or invalid mobile numbers
+    if not (number and valid_mobile_number(number)):
+        message = create_return_body(number, "Mobile number is invalid")
+        return create_return_response(200, message)
+
     envvar = EnvVar()
     secret = Secret(envvar)
 
     # check if status exists in ddb
-    entry = check_user_status(number)
+    entry = check_user_status(number, envvar)
 
     # returned cached entry if it exists and status is not pending or denied
-    if entry is not None and entry["statusCode"] == 200:
-        return create_return_status(200, entry["message"])
+    if entry is not None and entry["request_status"] == APPROVED:
+        message = create_return_body(number, entry["message"], entry["colour"])
+        return create_return_response(200, message)
 
     # check ddb for pending request
-    entry = get_pending_request(number)
+    entry = get_pending_request(number, envvar)
 
     # create new request if it doesn't exist
     if entry is None:
         token = get_token(secret)
 
         if token is None:
-            message = json.dumps(
-                "Failed to get token from Aarogya Setu. Please try again"
+            message = create_return_body(
+                number, "Failed to get token from Aarogya Setu. Please try again"
             )
-            return create_return_status(200, message)
+            return create_return_response(502, message)
 
         request_id = create_new_request(number, token, secret)
 
         if request_id is None:
-            message = json.dumps(
-                "Failed to get request id from Aarogya Setu. Please try again"
+            message = create_return_body(
+                number, "Failed to get request id from Aarogya Setu. Please try again"
             )
-            return create_return_status(200, message)
+            return create_return_response(502, message)
 
-        store_pending_request(number, token, request_id)
+        store_pending_request(number, token, request_id, envvar)
     else:
         token = entry["token"]
         request_id = entry["request_id"]
 
     content = get_status_content(number, token, request_id, secret)
-    return_status = decode_status(number, content, secret)
 
-    store_user_status(number, return_status)
+    if content is None:
+        message = create_return_body(
+            number, "Failed to get status from Aarogya Setu. Please try again"
+        )
+        return create_return_response(502, message)
 
-    return return_status
+    # store rejected and approved statuses
+    if content["request_status"] != PENDING:
+        if content["request_status"] == APPROVED:
+            status = decode_status(content, secret)
+        else:
+            status = {
+                "message": "User as rejected request. Please create a new request",
+                "color_code": WHITE,
+            }
+
+        store_user_status(number, status, content["request_status"], envvar)
+        delete_pending_request(number, envvar)
+
+    return_response = create_reponse_from_status(
+        number, status, content["request_status"]
+    )
+    logger.info(return_response)
+
+    return return_response

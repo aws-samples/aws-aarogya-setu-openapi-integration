@@ -151,6 +151,16 @@ class AsetuapiStack(core.Stack):
             events.SqsEventSource(bulk_request_queue, batch_size=1)
         )
 
+        # give queue receiver access to tables, queue and ssm parameters
+        bulk_request_queue.grant_consume_messages(queue_receiver)
+        user_status_table.grant_read_write_data(queue_receiver)
+        requests_table.grant_read_write_data(queue_receiver)
+
+        jwt_secret.grant_read(queue_receiver)
+        api_key.grant_read(queue_receiver)
+        username.grant_read(queue_receiver)
+        password.grant_read(queue_receiver)
+
         scan_table = _lambda.Function(
             self,
             "ScanTableHandler",
@@ -163,16 +173,6 @@ class AsetuapiStack(core.Stack):
             },
         )
 
-        # grant permissions to lambda functions
-        bulk_request_queue.grant_consume_messages(queue_receiver)
-        user_status_table.grant_read_write_data(queue_receiver)
-        requests_table.grant_read_write_data(queue_receiver)
-
-        jwt_secret.grant_read(bulk_request)
-        api_key.grant_read(bulk_request)
-        username.grant_read(bulk_request)
-        password.grant_read(bulk_request)
-
         user_status_table.grant_read_data(scan_table)
 
         # create api endpoints with authorization
@@ -184,6 +184,7 @@ class AsetuapiStack(core.Stack):
                 allow_origins=apigw.Cors.ALL_ORIGINS
             ),
         )
+
         auth = apigw.CfnAuthorizer(
             self,
             "ApiCognitoAuthorizer",
@@ -195,8 +196,6 @@ class AsetuapiStack(core.Stack):
             provider_arns=[user_pool.user_pool_arn],
         )
 
-        # Solution from: https://github.com/aws/aws-cdk/issues/9023#issuecomment-658309644
-        # Override authorizer to use COGNITO
         single_request_integration = apigw.LambdaIntegration(single_request, proxy=True)
         single_request_resource = api.root.add_resource("status")
         single_method = single_request_resource.add_method(
@@ -205,12 +204,6 @@ class AsetuapiStack(core.Stack):
             api_key_required=False,
             authorizer=auth,
             authorization_type=apigw.AuthorizationType.COGNITO,
-        )
-        single_method.node.find_child("Resource").add_property_override(
-            "AuthorizationType", "COGNITO_USER_POOLS"
-        )
-        single_method.node.find_child("Resource").add_property_override(
-            "AuthorizerId", {"Ref": auth.logical_id}
         )
 
         bulk_request_integration = apigw.LambdaIntegration(bulk_request, proxy=True)
@@ -222,6 +215,26 @@ class AsetuapiStack(core.Stack):
             authorizer=auth,
             authorization_type=apigw.AuthorizationType.COGNITO,
         )
+
+        scan_table_integration = apigw.LambdaIntegration(scan_table, proxy=True)
+        scan_table_resource = api.root.add_resource("scan")
+        scan_method = scan_table_resource.add_method(
+            "GET",
+            scan_table_integration,
+            api_key_required=False,
+            authorizer=auth,
+            authorization_type=apigw.AuthorizationType.COGNITO,
+        )
+
+        # Override authorizer to use COGNITO to authorize apis
+        # Solution from: https://github.com/aws/aws-cdk/issues/9023#issuecomment-658309644
+        single_method.node.find_child("Resource").add_property_override(
+            "AuthorizationType", "COGNITO_USER_POOLS"
+        )
+        single_method.node.find_child("Resource").add_property_override(
+            "AuthorizerId", {"Ref": auth.logical_id}
+        )
+
         bulk_method.node.find_child("Resource").add_property_override(
             "AuthorizationType", "COGNITO_USER_POOLS"
         )
@@ -229,15 +242,6 @@ class AsetuapiStack(core.Stack):
             "AuthorizerId", {"Ref": auth.logical_id}
         )
 
-        scan_table_integration = apigw.LambdaIntegration(scan_table, proxy=True)
-        scan_table_resource = api.root.add_resource("scan")
-        scan_method = bulk_request_resource.add_method(
-            "GET",
-            scan_table_integration,
-            api_key_required=False,
-            authorizer=auth,
-            authorization_type=apigw.AuthorizationType.COGNITO,
-        )
         scan_method.node.find_child("Resource").add_property_override(
             "AuthorizationType", "COGNITO_USER_POOLS"
         )
@@ -270,7 +274,3 @@ class AsetuapiStack(core.Stack):
         core.CfnOutput(
             self, "stack-name", value=self.stack_name, export_name="stack-name"
         )
-
-    @property
-    def display_table(self) -> ddb.Table:
-        return self._user_status_table
