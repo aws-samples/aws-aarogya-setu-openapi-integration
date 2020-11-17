@@ -6,6 +6,8 @@ from aws_cdk import (
     aws_dynamodb as ddb,
 )
 
+from os import path
+
 
 class AsetuapiFrontendStack(core.Stack):
     def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
@@ -16,12 +18,13 @@ class AsetuapiFrontendStack(core.Stack):
             self,
             "ReactAppBucket",
             website_index_document="index.html",
+            website_error_document="404.html",
         )
 
         s3_dep.BucketDeployment(
             self,
-            "DeployReactApp",
-            sources=[s3_dep.Source.asset("client/build")],
+            "DeployNextJSReactApp",
+            sources=[s3_dep.Source.asset(path.join("client", "out"))],
             destination_bucket=bucket,
         )
 
