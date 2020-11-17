@@ -3,7 +3,6 @@ from aws_cdk import (
     aws_s3 as s3,
     aws_s3_deployment as s3_dep,
     aws_cloudfront as cloudfront,
-    aws_dynamodb as ddb,
 )
 
 from os import path
