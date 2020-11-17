@@ -73,10 +73,9 @@ def handler(event, context):
     items = []
     for item in data["Items"]:
 
-        # TODO add this before publishing
         # ignore expired items
-        # if item["expdate"] < str(int(datetime.now().timestamp())):
-        #     continue
+        if item["expdate"] < str(int(datetime.now().timestamp())):
+            continue
 
         del item["expdate"]
         del item["request_status"]

@@ -48,7 +48,7 @@ def create_return_status(status_code, body):
 def handler(event, context):
     """
     Receive comma separated mobile numbers and push them into a queue.
-    Format is "+9198XXXXXXXX,+9197XXXXXXXX"
+    Format is "+91XXXXXXXXXX,+91XXXXXXXXXX"
 
     Parameters
     ----------

@@ -8,7 +8,7 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_ssm as ssm,
 )
-
+from os import path
 
 API_NAME = "asetuapipoc"
 
@@ -87,6 +87,15 @@ class AsetuapiStack(core.Stack):
             time_to_live_attribute="expdate",
         )
 
+        # Create layer for lambda run time dependencies
+        dependency_layer = _lambda.LayerVersion(
+            self,
+            "PythonDependencies",
+            code=_lambda.Code.from_asset(path.join("lambda", "dependency-layer.zip")),
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_7],
+            description="The layer contains requests and pyjwt dependencies",
+        )
+
         # Create Lambda functions
         single_request = _lambda.Function(
             self,
@@ -95,6 +104,7 @@ class AsetuapiStack(core.Stack):
             code=_lambda.Code.asset("lambda"),
             handler="single_request.handler",
             timeout=core.Duration.seconds(10),
+            layers=[dependency_layer],
             environment={
                 "USER_STATUS_TABLE": user_status_table.table_name,
                 "REQUESTS_TABLE": requests_table.table_name,
@@ -134,7 +144,8 @@ class AsetuapiStack(core.Stack):
             runtime=_lambda.Runtime.PYTHON_3_7,
             code=_lambda.Code.asset("lambda"),
             handler="queue_receiver.handler",
-            timeout=core.Duration.seconds(30),
+            timeout=core.Duration.seconds(10),
+            layers=[dependency_layer],
             environment={
                 "USER_STATUS_TABLE": user_status_table.table_name,
                 "REQUESTS_TABLE": requests_table.table_name,

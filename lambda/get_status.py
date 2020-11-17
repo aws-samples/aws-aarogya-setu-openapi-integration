@@ -171,7 +171,7 @@ def create_return_body(mobile_number, message, colour="#FFFFFF"):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     message: str
         User status message
     color: str
@@ -257,7 +257,7 @@ def store_user_status(number, status, request_status, envvar):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     status: dict
         Status returned by Aarogya Setu API
     request_status: str
@@ -292,7 +292,7 @@ def store_pending_request(number, token, request_id, envvar):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     token: str
         Request token given returned as reponse from TOKEN_URL
     request_id: str
@@ -330,7 +330,7 @@ def delete_pending_request(number, envvar):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     envvar: EnvVar
         Object contains environment variables
     """
@@ -350,7 +350,7 @@ def get_pending_request(number, envvar):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     envvar: EnvVar
         Object contains environment variables
     """
@@ -376,7 +376,7 @@ def check_user_status(number, envvar):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     envvar: EnvVar
         Object contains environment variables
     """
@@ -426,7 +426,7 @@ def create_new_request(number, token, secret):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     token: str
         Request token given returned as reponse from TOKEN_URL
     secret: Secret
@@ -459,7 +459,7 @@ def get_status_content(number, token, request_id, secret):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     token: str
         Request token given returned as reponse from TOKEN_URL
     secret: Secret
@@ -507,7 +507,7 @@ def create_reponse_from_status(number, status, request_status):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     status: dict
         status of user given by Aarogya Setu API
     request_status: str
@@ -536,7 +536,7 @@ def valid_mobile_number(number):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     """
 
     return MOBILE_NUMBER_EXPRESSION.match(number)
@@ -551,7 +551,7 @@ def check_mobile_number(number):
     Parameters
     ----------
     number: str
-        User mobile number of the format "+919XXXXXXXXX"
+        User mobile number of the format "+91XXXXXXXXXX"
     """
 
     # reject empty or invalid mobile numbers
@@ -604,15 +604,17 @@ def check_mobile_number(number):
         )
         return create_return_response(502, message)
 
+    # default status
+    status = {
+        "message": "User as rejected request. Please create a new request",
+        "color_code": WHITE,
+    }
+
     # store rejected and approved statuses
     if content["request_status"] != PENDING:
+
         if content["request_status"] == APPROVED:
             status = decode_status(content, secret)
-        else:
-            status = {
-                "message": "User as rejected request. Please create a new request",
-                "color_code": WHITE,
-            }
 
         store_user_status(number, status, content["request_status"], envvar)
         delete_pending_request(number, envvar)

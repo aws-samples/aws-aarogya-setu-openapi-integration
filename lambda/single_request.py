@@ -11,7 +11,7 @@ logger.setLevel(logging.INFO)
 def handler(event, context):
     """
     Receive a mobile number and query Aarogya Setu about it's status.
-    Mobile number format is "+9198XXXXXXXX"
+    Mobile number format is "+91XXXXXXXXXX"
 
     Parameters
     ----------
