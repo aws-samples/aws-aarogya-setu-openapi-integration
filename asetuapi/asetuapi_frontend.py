@@ -6,13 +6,9 @@ from aws_cdk import (
     aws_dynamodb as ddb,
 )
 
-from cdk_dynamo_table_viewer import TableViewer
-
 
 class AsetuapiFrontendStack(core.Stack):
-    def __init__(
-        self, scope: core.Construct, id: str, table: ddb.Table, **kwargs
-    ) -> None:
+    def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         # deploy application to s3 bucket behind cloudfront
@@ -22,7 +18,7 @@ class AsetuapiFrontendStack(core.Stack):
             website_index_document="index.html",
         )
 
-        src = s3_dep.BucketDeployment(
+        s3_dep.BucketDeployment(
             self,
             "DeployReactApp",
             sources=[s3_dep.Source.asset("client/build")],
@@ -44,10 +40,8 @@ class AsetuapiFrontendStack(core.Stack):
             ],
         )
 
+        # only allows cloudfront distribution to read from bucket
         bucket.grant_read(oai.grant_principal)
-
-        # create table viewer
-        TableViewer(self, "UserStatusViewer", title="User Status Table", table=table)
 
         core.CfnOutput(
             self, id="appurl", value=f"https://{cfd.distribution_domain_name}"
