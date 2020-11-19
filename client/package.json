@@ -1,5 +1,5 @@
 {
-  "name": "AwsSafeHarbour",
+  "name": "awssafeharbour",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
     "next": "10.0.1",
     "react": "17.0.1",
     "react-dom": "17.0.1",
-    "sweetalert-react": "^0.4.11"
+    "react-toast-notifications": "^2.4.0"
   },
   "devDependencies": {
     "@fullhuman/postcss-purgecss": "^3.0.0",
