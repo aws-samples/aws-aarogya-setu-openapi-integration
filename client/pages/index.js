@@ -16,6 +16,12 @@ function Home() {
   const [data, setData] = useState([]);
   const { addToast } = useToasts();
 
+  // const api_endpoint = awsconfig.aws_cloud_logic_custom[0].endpoint;
+  const api_endpoint = awsconfig.aws_api_endpoint;
+  const single_number_url = api_endpoint + "status";
+  const bulk_number_url = api_endpoint + "bulk_status";
+  const scan_url = api_endpoint + "scan";
+
   useEffect(() => {
     API.configure();
   }, []);
@@ -29,14 +35,11 @@ function Home() {
       const token = user.signInUserSession.idToken.jwtToken;
 
       const res = await (
-        await fetch(
-          "https://suk3v9yzr4.execute-api.ap-south-1.amazonaws.com/prod/status",
-          {
-            method: "post",
-            headers: { Authorization: token },
-            body: JSON.stringify({ mobile_number: number }),
-          }
-        )
+        await fetch(single_number_url, {
+          method: "post",
+          headers: { Authorization: token },
+          body: JSON.stringify({ mobile_number: number }),
+        })
       ).json();
 
       addToast(res.message, {
@@ -61,14 +64,11 @@ function Home() {
       const token = user.signInUserSession.idToken.jwtToken;
 
       const res = await (
-        await fetch(
-          "https://suk3v9yzr4.execute-api.ap-south-1.amazonaws.com/prod/bulk_status",
-          {
-            method: "post",
-            headers: { Authorization: token },
-            body: JSON.stringify({ numbers: raw }),
-          }
-        )
+        await fetch(bulk_number_url, {
+          method: "post",
+          headers: { Authorization: token },
+          body: JSON.stringify({ numbers: raw }),
+        })
       ).json();
 
       console.log({ res });
@@ -94,12 +94,9 @@ function Home() {
     const token = user.signInUserSession.idToken.jwtToken;
 
     const res = await (
-      await fetch(
-        "https://suk3v9yzr4.execute-api.ap-south-1.amazonaws.com/prod/scan",
-        {
-          headers: { Authorization: token },
-        }
-      )
+      await fetch(scan_url, {
+        headers: { Authorization: token },
+      })
     ).json();
 
     if (Math.random() < 0.1) {
@@ -146,4 +143,3 @@ function HomeExport() {
 }
 
 export default withAuthenticator(HomeExport);
-

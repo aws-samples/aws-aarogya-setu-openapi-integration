@@ -239,49 +239,36 @@ class AsetuapiStack(core.Stack):
 
         # Override authorizer to use COGNITO to authorize apis
         # Solution from: https://github.com/aws/aws-cdk/issues/9023#issuecomment-658309644
-        single_method.node.find_child("Resource").add_property_override(
-            "AuthorizationType", "COGNITO_USER_POOLS"
-        )
-        single_method.node.find_child("Resource").add_property_override(
-            "AuthorizerId", {"Ref": auth.logical_id}
-        )
-
-        bulk_method.node.find_child("Resource").add_property_override(
-            "AuthorizationType", "COGNITO_USER_POOLS"
-        )
-        bulk_method.node.find_child("Resource").add_property_override(
-            "AuthorizerId", {"Ref": auth.logical_id}
-        )
-
-        scan_method.node.find_child("Resource").add_property_override(
-            "AuthorizationType", "COGNITO_USER_POOLS"
-        )
-        scan_method.node.find_child("Resource").add_property_override(
-            "AuthorizerId", {"Ref": auth.logical_id}
-        )
+        methods = [single_method, bulk_method, scan_method]
+        for method in methods:
+            method.node.find_child("Resource").add_property_override(
+                "AuthorizationType", "COGNITO_USER_POOLS"
+            )
+            method.node.find_child("Resource").add_property_override(
+                "AuthorizerId", {"Ref": auth.logical_id}
+            )
 
         core.CfnOutput(
             self,
             "user-pool-id",
             value=user_pool.user_pool_id,
-            export_name="user-pool-id",
+            export_name="USER-POOL-ID",
         )
         core.CfnOutput(
             self,
             "user-pool-web-client",
             value=user_pool_client.user_pool_client_id,
-            export_name="user-pool-web-client",
+            export_name="WEB-CLIENT-ID",
         )
-        core.CfnOutput(self, "api-name", value=API_NAME, export_name="api-name")
         core.CfnOutput(
-            self, "api-endpoint-url", value=api.url, export_name="api-endpoint-url"
+            self, "api-endpoint-url", value=api.url, export_name="API-ENDPOINT-URL"
         )
         core.CfnOutput(
             self,
             "deployment-region",
             value=self.region,
-            export_name="deployment-region",
+            export_name="REGION",
         )
         core.CfnOutput(
-            self, "stack-name", value=self.stack_name, export_name="stack-name"
+            self, "stack-name", value=self.stack_name, export_name="STACK-NAME"
         )
