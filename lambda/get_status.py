@@ -31,53 +31,36 @@ MOBILE_NUMBER_EXPRESSION = re.compile(r"^\+91\d{10}$")
 
 ssm = boto3.client("ssm")
 ddb = boto3.resource("dynamodb")
+secretsmanager = boto3.client("secretsmanager")
 
 
 class EnvVar:
     """
-    A class to store environemnt variables
+    A class to store environment variables
 
     Attributes
     ----------
-    JWT_KEY: str
-        Parameter key to get jwt secret for Aarogya Setu API
-    API_KEY_KEY: str
-        Parameter key to get api key Aarogya Setu API
-    USERNAME_KEY: str
-        Parameter key to get username for Aarogya Setu API
-    PASSWORD_KEY: str
-        Parameter key to get password for Aarogya Set API
     USER_STATUS_TABLE: str
         User status table name
     REQUESTS_TABLE: str
         Pending requests table name
+    API_SECRET_ARN: str
+        Arn for secret stored in secrets manager
     """
 
-    JWT_KEY = os.environ.get("JWT_KEY")
-    API_KEY_KEY = os.environ.get("API_KEY_KEY")
-    USERNAME_KEY = os.environ.get("USERNAME_KEY")
-    PASSWORD_KEY = os.environ.get("PASSWORD_KEY")
-    USER_STATUS_TABLE = os.environ.get("USER_STATUS_TABLE")
-    REQUESTS_TABLE = os.environ.get("REQUESTS_TABLE")
-
     def __init__(self):
-        if not self.JWT_KEY:
-            logger.error("Must set JWT_KEY in Lambda variables!")
-            raise SystemExit
-        if not self.API_KEY_KEY:
-            logger.error("Must set API_KEY_KEY in Lambda variables!")
-            raise SystemExit
-        if not self.USERNAME_KEY:
-            logger.error("Must set USERNAME_KEY in Lambda variables!")
-            raise SystemExit
-        if not self.PASSWORD_KEY:
-            logger.error("Must set PASSWORD_KEY in Lambda variables!")
-            raise SystemExit
+        self.USER_STATUS_TABLE = os.environ.get("USER_STATUS_TABLE")
+        self.REQUESTS_TABLE = os.environ.get("REQUESTS_TABLE")
+        self.API_SECRET_ARN = os.environ.get("API_SECRET_ARN")
+
         if not self.USER_STATUS_TABLE:
             logger.error("Must set USER_STATUS_TABLE in Lambda variables!")
             raise SystemExit
         if not self.REQUESTS_TABLE:
             logger.error("Must set REQUESTS_TABLE in Lambda variables!")
+            raise SystemExit
+        if not self.API_SECRET_ARN:
+            logger.error("Must set API_SECRET_ARN in Lambda variables!")
             raise SystemExit
 
 
@@ -91,50 +74,44 @@ class Secret:
     API_KEY: api key given by Aarogya Setu
     PASSWORD: password for Aarogya Setu account
     USERNAME: username for Aarogya Setu account
-
-    TODO: decrypt tokens
     """
 
     def __init__(self, envvar):
         """
-        Get credentials from parameter store
+        Get credentials from secrets manager store
 
         Parameters
         ----------
-        envvars: EnvVar
+        envvar: EnvVar
             object contains environment variables
         """
 
-        responses = ssm.get_parameters(
-            Names=[
-                envvar.JWT_KEY,
-                envvar.API_KEY_KEY,
-                envvar.USERNAME_KEY,
-                envvar.PASSWORD_KEY,
-            ],
-            WithDecryption=False,
-        )
+        response = {}
+        try:
+            response = secretsmanager.get_secret_value(SecretId=envvar.API_SECRET_ARN)
+        except ClientError as e:
+            logger.error(f"Failed to get secrets from secrets manager.\n{e}")
 
-        parameters = {}
-        for response in responses.get("Parameters"):
-            parameters[response.get("Name")] = response.get("Value")
+        secrets = {}
+        if "SecretString" in response:
+            secrets = json.loads(response["SecretString"])
 
-        self.JWT_SECRET = parameters.get(envvar.JWT_KEY)
-        self.API_KEY = parameters.get(envvar.API_KEY_KEY)
-        self.PASSWORD = parameters.get(envvar.PASSWORD_KEY)
-        self.USERNAME = parameters.get(envvar.USERNAME_KEY)
+        self.JWT_SECRET = secrets.get("JWT_SECRET")
+        self.API_KEY = secrets.get("API_KEY")
+        self.PASSWORD = secrets.get("PASSWORD")
+        self.USERNAME = secrets.get("USERNAME")
 
         if not self.JWT_SECRET:
-            logger.error("Could not get JWT_SECRET from parameter store")
+            logger.error("Could not get JWT_SECRET from secrets manager")
             raise SystemExit
         if not self.API_KEY:
-            logger.error("Could not get API_KEY from parameter store")
+            logger.error("Could not get API_KEY from secrets manager")
             raise SystemExit
         if not self.PASSWORD:
-            logger.error("Could not get PASSWORD from parameter store")
+            logger.error("Could not get PASSWORD from secrets manager")
             raise SystemExit
         if not self.USERNAME:
-            logger.error("Could not get USERNAME from parameter store")
+            logger.error("Could not get USERNAME from secrets manager")
             raise SystemExit
 
 

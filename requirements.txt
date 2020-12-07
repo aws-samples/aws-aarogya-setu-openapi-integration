@@ -9,4 +9,4 @@ aws-cdk.aws-cognito
 aws-cdk.aws-s3
 aws-cdk.aws-s3-deployment
 aws-cdk.aws-cloudfront
-aws-cdk.aws-ssm
+aws-cdk.aws-secretsmanager
