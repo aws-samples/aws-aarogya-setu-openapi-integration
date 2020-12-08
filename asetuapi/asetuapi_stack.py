@@ -10,20 +10,18 @@ from aws_cdk import (
 )
 from os import path
 
-API_NAME = "asetuapipoc"
-
 
 class AsetuapiStack(core.Stack):
     def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        api_secret = secretsmanager.Secret.from_secret_complete_arn(
+        api_secret = secretsmanager.Secret(
             self,
-            "ApiSecret",
-            secret_complete_arn="arn:aws:secretsmanager:ap-south-1:669807167988:secret:asetuapisecrets-6Dnp0z",
+            "ActualApiSecret",
+            description="Secrets required to communicate with Aarogya Setu OpenAPI",
         )
 
-        # create auth
+        # create cognito user pool for authentication
         user_pool = cognito.UserPool(
             self,
             "AppUserPool",
@@ -150,7 +148,6 @@ class AsetuapiStack(core.Stack):
         api = apigw.RestApi(
             self,
             "ASetuApiGateway",
-            rest_api_name=API_NAME,
             default_cors_preflight_options=apigw.CorsOptions(
                 allow_origins=apigw.Cors.ALL_ORIGINS
             ),
@@ -232,4 +229,10 @@ class AsetuapiStack(core.Stack):
         )
         core.CfnOutput(
             self, "stack-name", value=self.stack_name, export_name="STACK-NAME"
+        )
+        core.CfnOutput(
+            self,
+            "api-secret-arn",
+            value=api_secret.secret_full_arn,
+            export_name="API-SECRET-ARN",
         )

@@ -1,5 +1,4 @@
 import boto3
-import re
 
 from os import path
 
@@ -11,6 +10,7 @@ def generate_exports():
     with these values in aws-exports-template.js
     """
 
+    # get exported values from cloudformation outputs
     cfn = boto3.resource("cloudformation")
     stack = cfn.Stack("asetuapi")
     template_values = {}
@@ -18,6 +18,7 @@ def generate_exports():
         if "ExportName" in output:
             template_values[output["ExportName"]] = output["OutputValue"]
 
+    # replace placeholders in templates and write to file
     template = ""
     with open(path.join("client", "aws-exports-template.js")) as f:
         template = f.read()
