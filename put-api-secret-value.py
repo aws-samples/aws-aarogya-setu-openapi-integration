@@ -4,7 +4,7 @@ import json
 from botocore.exceptions import ClientError
 
 
-def update_secret():
+def put_api_secret_value():
     """
     Fetch full secret arn from cloudformation output values. Update
     secret with values from secret.json
@@ -34,4 +34,4 @@ def update_secret():
 
 
 if __name__ == "__main__":
-    update_secret()
+    put_api_secret_value()

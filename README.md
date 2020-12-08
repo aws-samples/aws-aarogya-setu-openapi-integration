@@ -6,30 +6,38 @@ This is application is an integration with Aarogya Setu OpenAPI which allows you
 
 We will be using AWS CDK to deploy our application stack. This will require you to install a few dependencies and tools, if you already have any of these installed please continue with the next step.
 
-1. Install aws cli - https://cdkworkshop.com/15-prerequisites/100-awscli.html
-2. Create an aws account and user that you will use to deploy the application - https://cdkworkshop.com/15-prerequisites/100-awscli.html
-3. Install node js, we'll need this to install aws cdk - https://cdkworkshop.com/15-prerequisites/300-nodejs.html
-4. Install aws-cdk toolkit - https://cdkworkshop.com/15-prerequisites/500-toolkit.html
-5. Install python - https://cdkworkshop.com/15-prerequisites/600-python.html
+1. Install all the pre-requisites for building and deploying cdk apps - https://cdkworkshop.com/15-prerequisites.html
+2. Install python - https://cdkworkshop.com/15-prerequisites/600-python.html
 
-The above steps install all the tools needed to work with AWS CDK projects. Open a terminal and follow the below steps to deploy your application.
+Note: For ease of demonstration and best experience this workshop assumes you have a user with Administrator access. You can configure more restrictive permissions for your user as required.
 
-1. Clone or download this repository to directory and `cd` into it. - `cd asetuapi`
-2. Create an empty placeholder directory for the build files from the frontend application. - `mkdir client/out`
-2. We'll have to install dependencies and build the frontend application in the client directory. `npm install --prefix client && npm run build --prefix client`
-3. Run `cdk ls` and you should see two stacks namely `asetuapi` for the backend and `asetuapifrontend` for the frontend
-4. Create a new virtual environnment to install stack related libraries. This creates a .env directory. `python3 -m venv .env`
-5. Activate the environment. If you're on Mac or Linux use `source .env/bin/activate`. If you're on windows use `.env\Scripts\activate.bat`
-6. Install the required libraries using `pip install -r requirements.txt`
-7. Bootstrap resources in your account so that cdk can deploy the application. `cdk bootstrap`
-8. Deploy backend using `cdk deploy asetuapi -y`. When deployment completes it will output the values of some resources we'll need these in the next step.
-9. Open the `client/src/aws-exports.js` file. Copy the previous values to their respective locations. For e.g. the value for `asetuapi.apiname` should be replace the placeholder for `<apiname>`. Save and close the file.
-10. Build the frontend appliaction using `npm install --prefix client && npm run build --prefix client`
+Download or clone the repo and open a terminal inside it. Change the placeholders inside `secrets.json` with the actual values. Then follow the below steps to deploy your application.
+
+```Bash
+mkdir client/out
+python3 -m venv .env
+source .env/bin/activate
+pip install -r requirements.txt
+python create-dependency-layer.py
+cdk deploy -y asetuapi
+python update-api-secret.py
+python generate-exports.py
+cdk deploy -y asetuapifrontend
+```
+
+These commands perform operations equivalent to the follwing steps. You can paste the commands directly or make the changes yourself.
+
+1. Clone or download this repository to directory and open it in terminal.
+2. `mkdir client/out` - This creates an empty placeholder directly for the frontend application build files. The cdk application cannot build without this directory being present.
+3. `python3 -m venv .env`  - Create a new virtual environnment to install dependencies. This creates a .env directory.
+4. Activate the environment. If you're on Mac or Linux use `source .env/bin/activate`. If you're on windows use `.env\Scripts\activate.bat`
+5. Install the required libraries using `pip install -r requirements.txt`
+6. Run `python create-dependency-layer.py`, this will install and package dependencies needed for the lambda functions in to zip file. CDK will use the zip file to create a Lambda layer.
+6. Fill the placeholders in `secrets.json` with the values from your Aarogya Setu OpenAPI portal.
+7. Bootstrap resources in your account so that cdk can deploy the application. `cdk bootstrap`. This is required only once for an account and region.
+8. Deploy backend using `cdk deploy asetuapi -y`. This command will deploy the backend infrastructure for the application.
+9. Values from the infrastructure are needed to build the deploy the frontend application. Run `python generate-exports.py`, this will fetch the values from cloudformation exports and write them to `client/aws-exports.js`.
+10. The cdk app also creates a secret in the AWS Secrets Manager but it does not put the api secret values in it. Run `python put-api-secret-value.py` to put values from `secrets.json` into AWS Secrets Manager.
+10. Build the frontend application using `npm install --prefix client && npm run build --prefix client`
 11. Deploy the fronted using `cdk deploy asetuapifrontend -y`. Open the `asetuapifrontend.appurl` to access the web page.
 12. VOILA! You can now ensure your employees are safe and sound.
-
-## CI/CD with CDK
-
-1. https://docs.aws.amazon.com/cdk/latest/guide/cdk_pipeline.html
-2. `export CDK_NEW_BOOTSTRAP=1`
-3. `npx cdk bootstrap`
