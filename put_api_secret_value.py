@@ -21,7 +21,7 @@ def put_api_secret_value():
     # put values in secret
     secretsmanager = boto3.client("secretsmanager")
     api_secrets = None
-    with open("secret.json") as f:
+    with open("secrets.json") as f:
         api_secrets = json.loads(f.read())
 
     try:

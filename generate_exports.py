@@ -27,7 +27,7 @@ def generate_exports():
         print(f"Writing {key} with {value}")
         template = template.replace(key, value)
 
-    with open(path.join("client", "test.js"), "w") as f:
+    with open(path.join("client", "aws-exports.js"), "w") as f:
         f.write(template)
 
 
