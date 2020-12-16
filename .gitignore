@@ -11,7 +11,7 @@ cdk.out
 
 # dependencies
 lambda/python
-lambda/depedency-layer.zip
+lambda/dependency-layer.zip
 
 # secrets
 secrets.json
