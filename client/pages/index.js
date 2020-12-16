@@ -16,7 +16,6 @@ function Home() {
   const [data, setData] = useState([]);
   const { addToast } = useToasts();
 
-  // const api_endpoint = awsconfig.aws_cloud_logic_custom[0].endpoint;
   const api_endpoint = awsconfig.aws_api_endpoint;
   const single_number_url = api_endpoint + "status";
   const bulk_number_url = api_endpoint + "bulk_status";

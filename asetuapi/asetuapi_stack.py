@@ -8,12 +8,23 @@ from aws_cdk import (
     aws_cognito as cognito,
     aws_secretsmanager as secretsmanager,
 )
+
 from os import path
+from typing import Callable
 
 
 class AsetuapiStack(core.Stack):
-    def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: core.Construct,
+        id: str,
+        create_dependency_layer: Callable[[], None],
+        **kwargs
+    ) -> None:
         super().__init__(scope, id, **kwargs)
+
+        # create dependency layer zip for lambda function
+        create_dependency_layer()
 
         api_secret = secretsmanager.Secret(
             self,

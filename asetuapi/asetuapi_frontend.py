@@ -6,11 +6,21 @@ from aws_cdk import (
 )
 
 from os import path
+from typing import Callable
 
 
 class AsetuapiFrontendStack(core.Stack):
-    def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: core.Construct,
+        id: str,
+        generate_exports_and_bundle: Callable[[], None],
+        **kwargs,
+    ) -> None:
         super().__init__(scope, id, **kwargs)
+
+        # generate exports file and bundle application
+        generate_exports_and_bundle()
 
         # deploy application to s3 bucket behind cloudfront
         bucket = s3.Bucket(

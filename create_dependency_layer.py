@@ -11,31 +11,39 @@ def create_dependency_layer():
     to create Lambda dependency layer
     """
 
-    # change directory so that relative paths work
-    os.chdir("lambda")
-
-    # install dependencies
+    # file paths
     requirements_file_path = "requirements.txt"
     target_directory = "python"
-    pip_main(
-        [
-            "install",
-            "-r",
-            requirements_file_path,
-            "--target",
-            target_directory,
-        ]
-    )
-
-    # package dependencies as a zip file
     zip_file_path = "dependency-layer.zip"
-    dep_zip = zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED)
 
-    for root, dirs, files in os.walk(target_directory):
-        for file in files:
-            dep_zip.write(os.path.join(root, file))
+    # change directory so that relative paths work
+    cwd = os.getcwd()
+    os.chdir("lambda")
 
-    dep_zip.close()
+    # create new dependency zip only if it doesn't exist
+    if not os.path.isfile(zip_file_path):
+
+        pip_main(
+            [
+                "install",
+                "-r",
+                requirements_file_path,
+                "--target",
+                target_directory,
+            ]
+        )
+
+        # package dependencies as a zip file
+        dep_zip = zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED)
+
+        for root, dirs, files in os.walk(target_directory):
+            for file in files:
+                dep_zip.write(os.path.join(root, file))
+
+        dep_zip.close()
+
+    # change directory back
+    os.chdir(cwd)
 
 
 if __name__ == "__main__":
