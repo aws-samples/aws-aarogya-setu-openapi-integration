@@ -36,3 +36,4 @@ These commands perform operations equivalent to the following steps. You can pas
 6. The cdk app also creates a secret in the AWS Secrets Manager but it does not put the api secret values in it. Fill the placeholders in `secrets.json` with the values from your Aarogya Setu OpenAPI account and then run `python put-api-secret-value.py`. This will put values from `secrets.json` into AWS Secrets Manager.
 7. Deploy the fronted using `cdk deploy asetuapifrontend`. It will package the frontend application for export and deploy the infrastructure. Open `asetuapifrontend.appurl` to access the web page.
 8. Sign up as a new user and then log in. VOILA! You can now check COVID risk status and make your office safe for everyone.
+
