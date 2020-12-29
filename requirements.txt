@@ -1,0 +1,12 @@
+aws-cdk.core
+
+aws-cdk.aws-lambda
+aws-cdk.aws-apigateway
+aws-cdk.aws-dynamodb
+aws-cdk.aws-sqs
+aws-cdk.aws-lambda-event-sources
+aws-cdk.aws-cognito
+aws-cdk.aws-s3
+aws-cdk.aws-s3-deployment
+aws-cdk.aws-cloudfront
+aws-cdk.aws-secretsmanager

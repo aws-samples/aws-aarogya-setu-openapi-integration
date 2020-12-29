@@ -1,0 +1,24 @@
+{
+  "name": "awssafeharbour",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && next export",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@aws-amplify/api": "^3.2.10",
+    "@aws-amplify/ui-react": "^0.2.27",
+    "aws-amplify": "^3.3.7",
+    "next": "10.0.1",
+    "react": "17.0.1",
+    "react-dom": "17.0.1",
+    "react-toast-notifications": "^2.4.0"
+  },
+  "devDependencies": {
+    "@fullhuman/postcss-purgecss": "^3.0.0",
+    "postcss-preset-env": "^6.7.0",
+    "tailwindcss": "^1.9.6"
+  }
+}
