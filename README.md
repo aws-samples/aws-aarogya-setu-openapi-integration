@@ -37,3 +37,6 @@ These commands perform operations equivalent to the following steps. You can pas
 7. Deploy the fronted using `cdk deploy asetuapifrontend`. It will package the frontend application for export and deploy the infrastructure. Open `asetuapifrontend.appurl` to access the web page.
 8. Sign up as a new user and then log in. VOILA! You can now check COVID risk status and make your office safe for everyone.
 
+### Cleaning up
+
+You can remove both stacks using `cdk destroy asetuapi asetuapifrontend`. The S3 bucket can be deleted after you remove the static files stored in it, or you can use the following command, `aws s3 rb --force s3://<bucket-name>`. Finally you can delete the `CDKToolkit` stack or leave it as it is.
