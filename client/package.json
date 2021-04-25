@@ -11,9 +11,9 @@
     "@aws-amplify/api": "^3.2.10",
     "@aws-amplify/ui-react": "^0.2.27",
     "aws-amplify": "^3.3.7",
-    "next": "10.0.1",
-    "react": "17.0.1",
-    "react-dom": "17.0.1",
+    "next": "^10.0.1",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
     "react-toast-notifications": "^2.4.0"
   },
   "devDependencies": {
