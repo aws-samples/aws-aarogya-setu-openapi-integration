@@ -1,6 +1,6 @@
 # ASETUAPI
 
-This is application is an integration with Aarogya Setu OpenAPI which allows you track your employees' COVID status and keep them safe.
+This is application is an integration with Aarogya Setu OpenAPI which allows you track your employees' COVID status and keep them safe. This code example is accompanied by this [blog post](https://aws.amazon.com/blogs/devops/integrating-with-aarogya-setu-open-api-on-aws-to-ensure-a-safe-workspace/).
 
 ## Instructions
 
